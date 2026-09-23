@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVEDOW CALL</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      padding: 25px;
+    }
+
+    h1 {
+      margin-top: 30px;
+    }
+
+    #status {
+      margin: 25px 0;
+      font-size: 18px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 16px 35px;
+      font-size: 20px;
+      background: #16c784;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+    }
+
+    video {
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 15px;
+      background: black;
+    }
+
+    #videoArea {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>AVEDOW CALL</h1>
+
+  <div id="status">
+    🟢 Siap melakukan panggilan
+  </div>
+
+  <button id="panggil">
+    📞 PANGGIL
+  </button>
+
+  <div id="videoArea">
+
+    <p>🎥 Kamera Anda</p>
+
+    <video
+      id="localVideo"
+      autoplay
+      muted
+      playsinline>
+    </video>
+
+    <p>📹 Video Penerima</p>
+
+    <video
+      id="remoteVideo"
+      autoplay
+      playsinline>
+    </video>
+
+  </div>
+
+</div>
+
+<script type="module">
+
+  import {
+    initializeApp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+  import {
+    getAuth,
+    signInAnonymously
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    updateDoc,
+    arrayUnion,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+
+  // =====================================
+  // FIREBASE
+  // =====================================
+
+  const firebaseConfig = {
+
+    apiKey: "NANTI_KITA_ISI",
+
+    authDomain: "NANTI_KITA_ISI",
+
+    projectId: "NANTI_KITA_ISI",
+
+    storageBucket: "NANTI_KITA_ISI",
+
+    messagingSenderId: "NANTI_KITA_ISI",
+
+    appId: "NANTI_KITA_ISI"
+
+  };
+
+
+  // =====================================
+  // BELUM AKTIF
+  // =====================================
+  //
+  // Firebase baru belum dibuat.
+  // Setelah Firebase baru selesai,
+  // bagian konfigurasi di atas akan kita isi.
+  //
+
+
+  const statusText =
+    document.getElementById("status");
+
+  const panggilButton =
+    document.getElementById("panggil");
+
+
+  panggilButton.addEventListener(
+    "click",
+    () => {
+
+      statusText.textContent =
+        "⏳ Firebase belum dihubungkan.";
+
+    }
+  );
+
+</script>
+
+</body>
+</html>
