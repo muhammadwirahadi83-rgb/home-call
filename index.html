@@ -3,37 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Home Call</title>
+
+  <title>HOME CALL</title>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      padding: 20px;
       background: #111;
       color: white;
+      font-family: Arial, sans-serif;
       text-align: center;
     }
 
     h1 {
-      margin-top: 30px;
+      margin-top: 20px;
     }
 
     #status {
       margin: 20px auto;
       padding: 15px;
-      width: 85%;
       max-width: 500px;
       background: #222;
       border-radius: 12px;
     }
 
     button {
-      padding: 16px 40px;
-      font-size: 20px;
-      border: 0;
+      width: 80%;
+      max-width: 350px;
+      padding: 16px;
+      border: none;
       border-radius: 12px;
       background: #00aaff;
       color: white;
+      font-size: 20px;
+      font-weight: bold;
     }
 
     button:disabled {
@@ -41,16 +49,17 @@
     }
 
     .video-box {
-      width: 90%;
       max-width: 600px;
-      margin: 20px auto;
+      margin: 25px auto;
     }
 
     video {
       width: 100%;
+      min-height: 200px;
+      margin-bottom: 15px;
       background: black;
       border-radius: 12px;
-      margin-top: 10px;
+      object-fit: cover;
     }
   </style>
 </head>
@@ -59,22 +68,43 @@
 
   <h1>HOME CALL</h1>
 
-  <div id="status">Menghubungkan ke Firebase...</div>
+  <div id="status">
+    Menghubungkan...
+  </div>
 
-  <button id="callButton" disabled>PANGGIL</button>
+  <button id="callButton" disabled>
+    PANGGIL
+  </button>
 
   <div class="video-box">
+
     <h3>Kamera Saya</h3>
-    <video id="localVideo" autoplay muted playsinline></video>
+    <video
+      id="localVideo"
+      autoplay
+      muted
+      playsinline>
+    </video>
 
     <h3>Kamera Penerima</h3>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <video
+      id="remoteVideo"
+      autoplay
+      playsinline>
+    </video>
+
   </div>
+
 
   <script type="module">
 
-    import { initializeApp }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    // =====================================================
+    // FIREBASE
+    // =====================================================
+
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
     import {
       getAuth,
@@ -93,29 +123,44 @@
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
-    // =========================
-    // FIREBASE
-    // =========================
-
     const firebaseConfig = {
-      apiKey: "AIzaSyDyAki8b-cgy8UKD7lOJzYA-rvLXqHOmUw",
-      authDomain: "home-call-947c8.firebaseapp.com",
-      projectId: "home-call-947c8",
-      storageBucket: "home-call-947c8.firebasestorage.app",
-      messagingSenderId: "1070052309799",
-      appId: "1:1070052309799:web:e35fff55d6c8b6625cc702",
-      measurementId: "G-3CH3K7SKGP"
+
+      apiKey:
+        "AIzaSyDyAki8b-cgy8UKD7lOJzYA-rvLXqHOmUw",
+
+      authDomain:
+        "home-call-947c8.firebaseapp.com",
+
+      projectId:
+        "home-call-947c8",
+
+      storageBucket:
+        "home-call-947c8.firebasestorage.app",
+
+      messagingSenderId:
+        "1070052309799",
+
+      appId:
+        "1:1070052309799:web:e35fff55d6c8b6625cc702",
+
+      measurementId:
+        "G-3CH3K7SKGP"
     };
 
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    const app =
+      initializeApp(firebaseConfig);
+
+    const auth =
+      getAuth(app);
+
+    const db =
+      getFirestore(app);
 
 
-    // =========================
+    // =====================================================
     // ELEMENT
-    // =========================
+    // =====================================================
 
     const status =
       document.getElementById("status");
@@ -130,236 +175,346 @@
       document.getElementById("remoteVideo");
 
 
-    let user = null;
-    let peer = null;
-    let stream = null;
-    let callId = null;
+    // =====================================================
+    // VARIABLE
+    // =====================================================
+
+    let currentUser = null;
+
+    let peerConnection = null;
+
+    let localStream = null;
+
+    let currentCallId = null;
+
+    let receiverCandidatesAdded =
+      new Set();
 
 
-    // =========================
+    // =====================================================
     // WEBRTC
-    // =========================
+    // =====================================================
 
-    const rtcConfig = {
+    const rtcConfiguration = {
+
       iceServers: [
+
         {
-          urls: "stun:stun.l.google.com:19302"
+          urls:
+            "stun:stun.l.google.com:19302"
         },
+
         {
-          urls: "stun:stun1.l.google.com:19302"
+          urls:
+            "stun:stun1.l.google.com:19302"
         }
+
       ]
+
     };
 
 
-    // =========================
+    // =====================================================
     // FIREBASE LOGIN
-    // =========================
+    // =====================================================
+
+    status.textContent =
+      "Menghubungkan ke Firebase...";
+
 
     signInAnonymously(auth)
-      .then(() => {
-
-        console.log("Firebase login berhasil");
-
-      })
       .catch((error) => {
 
-        console.error(error);
+        console.error(
+          "Firebase login error:",
+          error
+        );
 
         status.textContent =
-          "Firebase gagal: " + error.message;
+          "Firebase gagal: " +
+          error.message;
 
       });
 
 
-    onAuthStateChanged(auth, (firebaseUser) => {
+    onAuthStateChanged(
+      auth,
+      (user) => {
 
-      if (!firebaseUser) return;
+        if (!user) {
+          return;
+        }
 
-      user = firebaseUser;
+        currentUser =
+          user;
 
-      status.textContent =
-        "Firebase terhubung. Siap melakukan panggilan";
+        status.textContent =
+          "Siap melakukan panggilan";
 
-      callButton.disabled = false;
+        callButton.disabled =
+          false;
 
-      console.log(
-        "User:",
-        user.uid
-      );
-
-    });
-
-
-    // =========================
-    // TOMBOL PANGGIL
-    // =========================
-
-    callButton.addEventListener(
-      "click",
-      mulaiPanggilan
+      }
     );
 
 
-    async function mulaiPanggilan() {
+    // =====================================================
+    // TOMBOL PANGGIL
+    // =====================================================
+
+    callButton.addEventListener(
+      "click",
+      async () => {
+
+        await startCall();
+
+      }
+    );
+
+
+    // =====================================================
+    // MULAI PANGGILAN
+    // =====================================================
+
+    async function startCall() {
 
       try {
 
-        callButton.disabled = true;
+        if (!currentUser) {
+
+          status.textContent =
+            "Firebase belum terhubung.";
+
+          return;
+
+        }
+
+
+        callButton.disabled =
+          true;
+
 
         status.textContent =
-          "Meminta izin kamera dan mikrofon...";
+          "Meminta akses kamera dan mikrofon...";
 
 
-        // =========================
+        // =================================================
         // KAMERA + MICROPHONE
-        // =========================
+        // =================================================
 
-        stream =
+        localStream =
           await navigator.mediaDevices.getUserMedia({
 
             video: true,
+
             audio: true
 
           });
 
 
-        localVideo.srcObject = stream;
+        localVideo.srcObject =
+          localStream;
 
 
         status.textContent =
           "Kamera aktif. Membuat panggilan...";
 
 
-        // =========================
-        // WEBRTC
-        // =========================
+        // =================================================
+        // PEER CONNECTION
+        // =================================================
 
-        peer =
-          new RTCPeerConnection(rtcConfig);
+        peerConnection =
+          new RTCPeerConnection(
+            rtcConfiguration
+          );
 
 
-        stream.getTracks().forEach(
-          (track) => {
+        // =================================================
+        // MASUKKAN KAMERA + AUDIO SENDIRI
+        // =================================================
 
-            peer.addTrack(
-              track,
-              stream
+        for (
+          const track
+          of localStream.getTracks()
+        ) {
+
+          peerConnection.addTrack(
+            track,
+            localStream
+          );
+
+        }
+
+
+        // =================================================
+        // MENERIMA VIDEO DARI RECEIVER
+        // =================================================
+
+        peerConnection.ontrack =
+          (event) => {
+
+            console.log(
+              "Remote stream diterima"
             );
 
-          }
-        );
+
+            if (
+              event.streams &&
+              event.streams.length > 0
+            ) {
+
+              remoteVideo.srcObject =
+                event.streams[0];
+
+              status.textContent =
+                "TERHUBUNG";
+
+            }
+
+          };
 
 
-        // =========================
-        // VIDEO PENERIMA
-        // =========================
+        // =================================================
+        // ICE CANDIDATE CALLER
+        // =================================================
 
-        peer.ontrack = (event) => {
+        peerConnection.onicecandidate =
+          async (event) => {
 
-          if (
-            event.streams &&
-            event.streams[0]
-          ) {
+            if (
+              !event.candidate
+            ) {
 
-            remoteVideo.srcObject =
-              event.streams[0];
+              return;
 
-            status.textContent =
-              "TERHUBUNG";
-
-          }
-
-        };
+            }
 
 
-        // =========================
+            if (!currentCallId) {
+
+              return;
+
+            }
+
+
+            try {
+
+              await updateDoc(
+
+                doc(
+                  db,
+                  "calls",
+                  currentCallId
+                ),
+
+                {
+
+                  callerCandidates:
+                    arrayUnion(
+                      event.candidate.toJSON()
+                    )
+
+                }
+
+              );
+
+            } catch (error) {
+
+              console.error(
+                "ICE caller error:",
+                error
+              );
+
+            }
+
+          };
+
+
+        // =================================================
         // BUAT OFFER
-        // =========================
+        // =================================================
 
         const offer =
-          await peer.createOffer();
+          await peerConnection.createOffer();
 
-        await peer.setLocalDescription(
+
+        await peerConnection.setLocalDescription(
           offer
         );
 
 
-        // =========================
-        // BUAT CALL DI FIRESTORE
-        // =========================
+        // =================================================
+        // SIMPAN PANGGILAN KE FIRESTORE
+        // =================================================
 
-        const callRef =
+        const callDocument =
           await addDoc(
-            collection(db, "calls"),
+
+            collection(
+              db,
+              "calls"
+            ),
+
             {
 
-              callerId: user.uid,
+              callerId:
+                currentUser.uid,
 
-              status: "menunggu",
+              status:
+                "menunggu",
 
-              createdAtMs: Date.now(),
+              createdAtMs:
+                Date.now(),
 
               offer: {
-                type: offer.type,
-                sdp: offer.sdp
+
+                type:
+                  offer.type,
+
+                sdp:
+                  offer.sdp
+
               },
 
-              answer: null,
+              answer:
+                null,
 
-              callerCandidates: [],
+              callerCandidates:
+                [],
 
-              receiverCandidates: []
+              receiverCandidates:
+                []
 
             }
+
           );
 
 
-        callId = callRef.id;
+        currentCallId =
+          callDocument.id;
+
+
+        console.log(
+          "Call ID:",
+          currentCallId
+        );
 
 
         status.textContent =
           "Panggilan dibuat. Menunggu penerima...";
 
 
-        // =========================
-        // ICE CALLER
-        // =========================
-
-        peer.onicecandidate =
-          async (event) => {
-
-            if (!event.candidate)
-              return;
-
-            await updateDoc(
-              doc(
-                db,
-                "calls",
-                callId
-              ),
-              {
-
-                callerCandidates:
-                  arrayUnion(
-                    event.candidate.toJSON()
-                  )
-
-              }
-            );
-
-          };
-
-
-        // =========================
-        // MENUNGGU ANSWER
-        // =========================
+        // =================================================
+        // PANTAU JAWABAN RECEIVER
+        // =================================================
 
         onSnapshot(
+
           doc(
             db,
             "calls",
-            callId
+            currentCallId
           ),
 
           async (snapshot) => {
@@ -367,53 +522,107 @@
             const data =
               snapshot.data();
 
-            if (!data) return;
 
+            if (!data) {
 
-            if (
-              data.answer &&
-              !peer.currentRemoteDescription
-            ) {
-
-              await peer.setRemoteDescription(
-
-                new RTCSessionDescription(
-                  data.answer
-                )
-
-              );
-
-              status.textContent =
-                "Penerima menjawab. Menghubungkan...";
+              return;
 
             }
 
 
-            // =========================
-            // ICE PENERIMA
-            // =========================
+            // =============================================
+            // ANSWER
+            // =============================================
 
             if (
-              data.receiverCandidates
+              data.answer &&
+              !peerConnection.currentRemoteDescription
+            ) {
+
+              console.log(
+                "Answer dari penerima diterima"
+              );
+
+
+              try {
+
+                await peerConnection.setRemoteDescription(
+
+                  new RTCSessionDescription(
+                    data.answer
+                  )
+
+                );
+
+
+                status.textContent =
+                  "Penerima menjawab. Menghubungkan...";
+
+
+              } catch (error) {
+
+                console.error(
+                  "Answer error:",
+                  error
+                );
+
+              }
+
+            }
+
+
+            // =============================================
+            // ICE CANDIDATE RECEIVER
+            // =============================================
+
+            if (
+              Array.isArray(
+                data.receiverCandidates
+              )
             ) {
 
               for (
-                const candidate
+                const candidateData
                 of data.receiverCandidates
               ) {
 
+                const key =
+                  JSON.stringify(
+                    candidateData
+                  );
+
+
+                if (
+                  receiverCandidatesAdded.has(
+                    key
+                  )
+                ) {
+
+                  continue;
+
+                }
+
+
+                receiverCandidatesAdded.add(
+                  key
+                );
+
+
                 try {
 
-                  await peer.addIceCandidate(
+                  await peerConnection.addIceCandidate(
+
                     new RTCIceCandidate(
-                      candidate
+                      candidateData
                     )
+
                   );
 
                 } catch (error) {
 
                   console.log(
-                    "ICE belum siap"
+                    "ICE receiver belum bisa ditambahkan:",
+                    error
                   );
 
                 }
@@ -422,20 +631,113 @@
 
             }
 
+
+            // =============================================
+            // STATUS
+            // =============================================
+
+            if (
+              data.status ===
+              "terhubung"
+            ) {
+
+              status.textContent =
+                "TERHUBUNG";
+
+            }
+
+
+            if (
+              data.status ===
+              "ditolak"
+            ) {
+
+              status.textContent =
+                "Panggilan ditolak.";
+
+              stopCall();
+
+            }
+
           }
+
         );
 
 
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          "CALL ERROR:",
+          error
+        );
 
-        callButton.disabled = false;
 
-        status.textContent =
-          "Gagal: " + error.message;
+        callButton.disabled =
+          false;
+
+
+        if (
+          error.name ===
+          "NotAllowedError"
+        ) {
+
+          status.textContent =
+            "Izin kamera/mikrofon ditolak.";
+
+        } else {
+
+          status.textContent =
+            "Gagal: " +
+            error.message;
+
+        }
 
       }
+
+    }
+
+
+    // =====================================================
+    // MATIKAN PANGGILAN
+    // =====================================================
+
+    function stopCall() {
+
+      if (localStream) {
+
+        localStream
+          .getTracks()
+          .forEach(
+            (track) => track.stop()
+          );
+
+      }
+
+
+      if (peerConnection) {
+
+        peerConnection.close();
+
+      }
+
+
+      localVideo.srcObject =
+        null;
+
+      remoteVideo.srcObject =
+        null;
+
+      peerConnection =
+        null;
+
+      localStream =
+        null;
+
+      currentCallId =
+        null;
+
+      callButton.disabled =
+        false;
 
     }
 
