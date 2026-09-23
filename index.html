@@ -6,10 +6,6 @@
   <title>Home Call</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -23,28 +19,29 @@
     }
 
     #status {
-      margin: 20px;
-      padding: 12px;
+      margin: 20px auto;
+      padding: 15px;
+      width: 85%;
+      max-width: 500px;
       background: #222;
-      border-radius: 10px;
+      border-radius: 12px;
     }
 
     button {
-      padding: 15px 35px;
+      padding: 16px 40px;
       font-size: 20px;
-      border: none;
+      border: 0;
       border-radius: 12px;
       background: #00aaff;
       color: white;
-      cursor: pointer;
     }
 
-    button:active {
-      transform: scale(0.97);
+    button:disabled {
+      opacity: 0.5;
     }
 
-    .videos {
-      width: 95%;
+    .video-box {
+      width: 90%;
       max-width: 600px;
       margin: 20px auto;
     }
@@ -62,11 +59,11 @@
 
   <h1>HOME CALL</h1>
 
-  <div id="status">Siap melakukan panggilan</div>
+  <div id="status">Menghubungkan ke Firebase...</div>
 
-  <button id="callButton">PANGGIL</button>
+  <button id="callButton" disabled>PANGGIL</button>
 
-  <div class="videos">
+  <div class="video-box">
     <h3>Kamera Saya</h3>
     <video id="localVideo" autoplay muted playsinline></video>
 
@@ -76,9 +73,8 @@
 
   <script type="module">
 
-    import {
-      initializeApp
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
     import {
       getAuth,
@@ -97,9 +93,9 @@
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
-    // ==============================
+    // =========================
     // FIREBASE
-    // ==============================
+    // =========================
 
     const firebaseConfig = {
       apiKey: "AIzaSyDyAki8b-cgy8UKD7lOJzYA-rvLXqHOmUw",
@@ -117,28 +113,34 @@
     const db = getFirestore(app);
 
 
-    // ==============================
+    // =========================
     // ELEMENT
-    // ==============================
+    // =========================
 
-    const callButton = document.getElementById("callButton");
-    const statusText = document.getElementById("status");
+    const status =
+      document.getElementById("status");
 
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
+    const callButton =
+      document.getElementById("callButton");
+
+    const localVideo =
+      document.getElementById("localVideo");
+
+    const remoteVideo =
+      document.getElementById("remoteVideo");
 
 
-    let currentUser = null;
-    let peerConnection = null;
-    let localStream = null;
-    let currentCallId = null;
+    let user = null;
+    let peer = null;
+    let stream = null;
+    let callId = null;
 
 
-    // ==============================
-    // STUN SERVER
-    // ==============================
+    // =========================
+    // WEBRTC
+    // =========================
 
-    const configuration = {
+    const rtcConfig = {
       iceServers: [
         {
           urls: "stun:stun.l.google.com:19302"
@@ -150,106 +152,294 @@
     };
 
 
-    // ==============================
-    // LOGIN ANONIM
-    // ==============================
+    // =========================
+    // FIREBASE LOGIN
+    // =========================
 
     signInAnonymously(auth)
+      .then(() => {
+
+        console.log("Firebase login berhasil");
+
+      })
       .catch((error) => {
+
         console.error(error);
-        statusText.textContent = "Gagal masuk Firebase";
+
+        status.textContent =
+          "Firebase gagal: " + error.message;
+
       });
 
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, (firebaseUser) => {
 
-      if (user) {
+      if (!firebaseUser) return;
 
-        currentUser = user;
+      user = firebaseUser;
 
-        statusText.textContent = "Siap melakukan panggilan";
+      status.textContent =
+        "Firebase terhubung. Siap melakukan panggilan";
 
-        console.log("User ID:", user.uid);
+      callButton.disabled = false;
 
-      }
+      console.log(
+        "User:",
+        user.uid
+      );
 
     });
 
 
-    // ==============================
+    // =========================
     // TOMBOL PANGGIL
-    // ==============================
+    // =========================
 
-    callButton.addEventListener("click", async () => {
+    callButton.addEventListener(
+      "click",
+      mulaiPanggilan
+    );
 
-      if (!currentUser) {
-        statusText.textContent = "Firebase belum siap...";
-        return;
-      }
+
+    async function mulaiPanggilan() {
 
       try {
 
         callButton.disabled = true;
 
-        statusText.textContent = "Menyalakan kamera...";
-
-        // ==============================
-        // AKSES KAMERA DAN MICROPHONE
-        // ==============================
-
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
-
-        localVideo.srcObject = localStream;
+        status.textContent =
+          "Meminta izin kamera dan mikrofon...";
 
 
-        // ==============================
-        // PEER CONNECTION
-        // ==============================
+        // =========================
+        // KAMERA + MICROPHONE
+        // =========================
 
-        peerConnection = new RTCPeerConnection(configuration);
+        stream =
+          await navigator.mediaDevices.getUserMedia({
 
+            video: true,
+            audio: true
 
-        // Tambahkan kamera + microphone
-        localStream.getTracks().forEach((track) => {
-
-          peerConnection.addTrack(
-            track,
-            localStream
-          );
-
-        });
+          });
 
 
-        // ==============================
-        // VIDEO DARI PENERIMA
-        // ==============================
+        localVideo.srcObject = stream;
 
-        peerConnection.ontrack = (event) => {
 
-          console.log("Menerima video dari penerima");
+        status.textContent =
+          "Kamera aktif. Membuat panggilan...";
 
-          if (event.streams && event.streams[0]) {
 
-            remoteVideo.srcObject = event.streams[0];
+        // =========================
+        // WEBRTC
+        // =========================
 
-            statusText.textContent = "TERHUBUNG";
+        peer =
+          new RTCPeerConnection(rtcConfig);
+
+
+        stream.getTracks().forEach(
+          (track) => {
+
+            peer.addTrack(
+              track,
+              stream
+            );
+
+          }
+        );
+
+
+        // =========================
+        // VIDEO PENERIMA
+        // =========================
+
+        peer.ontrack = (event) => {
+
+          if (
+            event.streams &&
+            event.streams[0]
+          ) {
+
+            remoteVideo.srcObject =
+              event.streams[0];
+
+            status.textContent =
+              "TERHUBUNG";
 
           }
 
         };
 
 
-        // ==============================
-        // BUAT CALL
-        // ==============================
+        // =========================
+        // BUAT OFFER
+        // =========================
 
-        const callRef = collection(db, "calls");
+        const offer =
+          await peer.createOffer();
+
+        await peer.setLocalDescription(
+          offer
+        );
 
 
-        // Buat OFFER terlebih dahulu
-        const offer = await peerConnection.createOffer();
+        // =========================
+        // BUAT CALL DI FIRESTORE
+        // =========================
 
-        await peerConnection.set
+        const callRef =
+          await addDoc(
+            collection(db, "calls"),
+            {
+
+              callerId: user.uid,
+
+              status: "menunggu",
+
+              createdAtMs: Date.now(),
+
+              offer: {
+                type: offer.type,
+                sdp: offer.sdp
+              },
+
+              answer: null,
+
+              callerCandidates: [],
+
+              receiverCandidates: []
+
+            }
+          );
+
+
+        callId = callRef.id;
+
+
+        status.textContent =
+          "Panggilan dibuat. Menunggu penerima...";
+
+
+        // =========================
+        // ICE CALLER
+        // =========================
+
+        peer.onicecandidate =
+          async (event) => {
+
+            if (!event.candidate)
+              return;
+
+            await updateDoc(
+              doc(
+                db,
+                "calls",
+                callId
+              ),
+              {
+
+                callerCandidates:
+                  arrayUnion(
+                    event.candidate.toJSON()
+                  )
+
+              }
+            );
+
+          };
+
+
+        // =========================
+        // MENUNGGU ANSWER
+        // =========================
+
+        onSnapshot(
+          doc(
+            db,
+            "calls",
+            callId
+          ),
+
+          async (snapshot) => {
+
+            const data =
+              snapshot.data();
+
+            if (!data) return;
+
+
+            if (
+              data.answer &&
+              !peer.currentRemoteDescription
+            ) {
+
+              await peer.setRemoteDescription(
+
+                new RTCSessionDescription(
+                  data.answer
+                )
+
+              );
+
+              status.textContent =
+                "Penerima menjawab. Menghubungkan...";
+
+            }
+
+
+            // =========================
+            // ICE PENERIMA
+            // =========================
+
+            if (
+              data.receiverCandidates
+            ) {
+
+              for (
+                const candidate
+                of data.receiverCandidates
+              ) {
+
+                try {
+
+                  await peer.addIceCandidate(
+                    new RTCIceCandidate(
+                      candidate
+                    )
+                  );
+
+                } catch (error) {
+
+                  console.log(
+                    "ICE belum siap"
+                  );
+
+                }
+
+              }
+
+            }
+
+          }
+        );
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        callButton.disabled = false;
+
+        status.textContent =
+          "Gagal: " + error.message;
+
+      }
+
+    }
+
+  </script>
+
+</body>
+</html>
