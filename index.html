@@ -3,9 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AVEDOW CALL</title>
+  <title>Home Call</title>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -14,156 +18,238 @@
       text-align: center;
     }
 
-    .container {
-      max-width: 500px;
-      margin: auto;
-      padding: 25px;
-    }
-
     h1 {
       margin-top: 30px;
     }
 
     #status {
-      margin: 25px 0;
-      font-size: 18px;
+      margin: 20px;
+      padding: 12px;
+      background: #222;
+      border-radius: 10px;
     }
 
     button {
+      padding: 15px 35px;
+      font-size: 20px;
       border: none;
       border-radius: 12px;
-      padding: 16px 35px;
-      font-size: 20px;
-      background: #16c784;
+      background: #00aaff;
       color: white;
       cursor: pointer;
     }
 
-    button:disabled {
-      opacity: 0.5;
+    button:active {
+      transform: scale(0.97);
+    }
+
+    .videos {
+      width: 95%;
+      max-width: 600px;
+      margin: 20px auto;
     }
 
     video {
       width: 100%;
-      margin-top: 20px;
-      border-radius: 15px;
       background: black;
-    }
-
-    #videoArea {
-      display: none;
+      border-radius: 12px;
+      margin-top: 10px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+  <h1>HOME CALL</h1>
 
-  <h1>AVEDOW CALL</h1>
+  <div id="status">Siap melakukan panggilan</div>
 
-  <div id="status">
-    🟢 Siap melakukan panggilan
+  <button id="callButton">PANGGIL</button>
+
+  <div class="videos">
+    <h3>Kamera Saya</h3>
+    <video id="localVideo" autoplay muted playsinline></video>
+
+    <h3>Kamera Penerima</h3>
+    <video id="remoteVideo" autoplay playsinline></video>
   </div>
 
-  <button id="panggil">
-    📞 PANGGIL
-  </button>
+  <script type="module">
 
-  <div id="videoArea">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-    <p>🎥 Kamera Anda</p>
+    import {
+      getAuth,
+      signInAnonymously,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    <video
-      id="localVideo"
-      autoplay
-      muted
-      playsinline>
-    </video>
-
-    <p>📹 Video Penerima</p>
-
-    <video
-      id="remoteVideo"
-      autoplay
-      playsinline>
-    </video>
-
-  </div>
-
-</div>
-
-<script type="module">
-
-  import {
-    initializeApp
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-
-  import {
-    getAuth,
-    signInAnonymously
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-  import {
-    getFirestore,
-    collection,
-    addDoc,
-    onSnapshot,
-    updateDoc,
-    arrayUnion,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      doc,
+      onSnapshot,
+      updateDoc,
+      arrayUnion
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
-  // =====================================
-  // FIREBASE
-  // =====================================
+    // ==============================
+    // FIREBASE
+    // ==============================
 
-  const firebaseConfig = {
-
-    apiKey: "NANTI_KITA_ISI",
-
-    authDomain: "NANTI_KITA_ISI",
-
-    projectId: "NANTI_KITA_ISI",
-
-    storageBucket: "NANTI_KITA_ISI",
-
-    messagingSenderId: "NANTI_KITA_ISI",
-
-    appId: "NANTI_KITA_ISI"
-
-  };
+    const firebaseConfig = {
+      apiKey: "AIzaSyDyAki8b-cgy8UKD7lOJzYA-rvLXqHOmUw",
+      authDomain: "home-call-947c8.firebaseapp.com",
+      projectId: "home-call-947c8",
+      storageBucket: "home-call-947c8.firebasestorage.app",
+      messagingSenderId: "1070052309799",
+      appId: "1:1070052309799:web:e35fff55d6c8b6625cc702",
+      measurementId: "G-3CH3K7SKGP"
+    };
 
 
-  // =====================================
-  // BELUM AKTIF
-  // =====================================
-  //
-  // Firebase baru belum dibuat.
-  // Setelah Firebase baru selesai,
-  // bagian konfigurasi di atas akan kita isi.
-  //
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
 
-  const statusText =
-    document.getElementById("status");
+    // ==============================
+    // ELEMENT
+    // ==============================
 
-  const panggilButton =
-    document.getElementById("panggil");
+    const callButton = document.getElementById("callButton");
+    const statusText = document.getElementById("status");
+
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
 
 
-  panggilButton.addEventListener(
-    "click",
-    () => {
+    let currentUser = null;
+    let peerConnection = null;
+    let localStream = null;
+    let currentCallId = null;
 
-      statusText.textContent =
-        "⏳ Firebase belum dihubungkan.";
 
-    }
-  );
+    // ==============================
+    // STUN SERVER
+    // ==============================
 
-</script>
+    const configuration = {
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302"
+        },
+        {
+          urls: "stun:stun1.l.google.com:19302"
+        }
+      ]
+    };
 
-</body>
-</html>
+
+    // ==============================
+    // LOGIN ANONIM
+    // ==============================
+
+    signInAnonymously(auth)
+      .catch((error) => {
+        console.error(error);
+        statusText.textContent = "Gagal masuk Firebase";
+      });
+
+
+    onAuthStateChanged(auth, (user) => {
+
+      if (user) {
+
+        currentUser = user;
+
+        statusText.textContent = "Siap melakukan panggilan";
+
+        console.log("User ID:", user.uid);
+
+      }
+
+    });
+
+
+    // ==============================
+    // TOMBOL PANGGIL
+    // ==============================
+
+    callButton.addEventListener("click", async () => {
+
+      if (!currentUser) {
+        statusText.textContent = "Firebase belum siap...";
+        return;
+      }
+
+      try {
+
+        callButton.disabled = true;
+
+        statusText.textContent = "Menyalakan kamera...";
+
+        // ==============================
+        // AKSES KAMERA DAN MICROPHONE
+        // ==============================
+
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+
+        localVideo.srcObject = localStream;
+
+
+        // ==============================
+        // PEER CONNECTION
+        // ==============================
+
+        peerConnection = new RTCPeerConnection(configuration);
+
+
+        // Tambahkan kamera + microphone
+        localStream.getTracks().forEach((track) => {
+
+          peerConnection.addTrack(
+            track,
+            localStream
+          );
+
+        });
+
+
+        // ==============================
+        // VIDEO DARI PENERIMA
+        // ==============================
+
+        peerConnection.ontrack = (event) => {
+
+          console.log("Menerima video dari penerima");
+
+          if (event.streams && event.streams[0]) {
+
+            remoteVideo.srcObject = event.streams[0];
+
+            statusText.textContent = "TERHUBUNG";
+
+          }
+
+        };
+
+
+        // ==============================
+        // BUAT CALL
+        // ==============================
+
+        const callRef = collection(db, "calls");
+
+
+        // Buat OFFER terlebih dahulu
+        const offer = await peerConnection.createOffer();
+
+        await peerConnection.set
