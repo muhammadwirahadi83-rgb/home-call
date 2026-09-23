@@ -3,16 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Home Call - Receiver</title>
+  <title>HOME CALL - Penerima</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
-      padding: 20px;
       font-family: Arial, sans-serif;
       background: #111;
       color: white;
@@ -20,27 +15,12 @@
     }
 
     h1 {
-      margin-top: 10px;
+      margin-top: 25px;
     }
 
     #status {
-      margin: 20px auto;
-      padding: 12px;
-      max-width: 500px;
-      background: #222;
-      border-radius: 10px;
-    }
-
-    .call-box {
-      max-width: 600px;
-      margin: auto;
-    }
-
-    .call-item {
-      background: #222;
-      padding: 20px;
-      border-radius: 15px;
-      margin-top: 20px;
+      margin: 15px;
+      font-size: 18px;
     }
 
     button {
@@ -48,26 +28,37 @@
       margin: 8px;
       border: none;
       border-radius: 10px;
-      font-size: 18px;
+      font-size: 17px;
       cursor: pointer;
     }
 
     #acceptButton {
-      background: #00aa55;
+      background: #20c55a;
       color: white;
     }
 
     #rejectButton {
-      background: #cc2222;
+      background: #e53935;
       color: white;
+    }
+
+    .videos {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding: 15px;
     }
 
     video {
       width: 100%;
-      max-width: 600px;
-      margin-top: 15px;
+      max-width: 500px;
+      margin: auto;
       background: black;
-      border-radius: 12px;
+      border-radius: 15px;
+    }
+
+    #controls {
+      display: none;
     }
   </style>
 </head>
@@ -76,34 +67,24 @@
 
   <h1>HOME CALL</h1>
 
-  <div id="status">
-    Menunggu panggilan...
+  <div id="status">Menghubungkan...</div>
+
+  <div id="controls">
+    <button id="acceptButton">TERIMA</button>
+    <button id="rejectButton">TOLAK</button>
   </div>
 
-  <div class="call-box">
-
-    <div class="call-item">
-
-      <h2>Panggilan Masuk</h2>
-
-      <button id="acceptButton">
-        TERIMA
-      </button>
-
-      <button id="rejectButton">
-        TOLAK
-      </button>
-
+  <div class="videos">
+    <div>
+      <p>Kamera Saya</p>
+      <video id="localVideo" autoplay muted playsinline></video>
     </div>
 
-    <h3>Kamera Saya</h3>
-    <video id="localVideo" autoplay muted playsinline></video>
-
-    <h3>Kamera Pemanggil</h3>
-    <video id="remoteVideo" autoplay playsinline></video>
-
+    <div>
+      <p>Kamera Penelpon</p>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
   </div>
-
 
   <script type="module">
 
@@ -121,16 +102,17 @@
       getFirestore,
       collection,
       query,
+      where,
       onSnapshot,
       doc,
       updateDoc,
-      arrayUnion
+      getDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
-    // ==================================
+    // =========================
     // FIREBASE
-    // ==================================
+    // =========================
 
     const firebaseConfig = {
       apiKey: "AIzaSyDyAki8b-cgy8UKD7lOJzYA-rvLXqHOmUw",
@@ -150,18 +132,20 @@
     const db = getFirestore(app);
 
 
-    // ==================================
+    // =========================
     // ELEMENT
-    // ==================================
+    // =========================
 
-    const statusText =
-      document.getElementById("status");
+    const statusText = document.getElementById("status");
 
     const acceptButton =
       document.getElementById("acceptButton");
 
     const rejectButton =
       document.getElementById("rejectButton");
+
+    const controls =
+      document.getElementById("controls");
 
     const localVideo =
       document.getElementById("localVideo");
@@ -170,518 +154,102 @@
       document.getElementById("remoteVideo");
 
 
-    // ==================================
-    // VARIABLE
-    // ==================================
-
-    let currentUser = null;
-
-    let currentCallId = null;
-
-    let currentCallData = null;
+    // =========================
+    // WEBRTC
+    // =========================
 
     let peerConnection = null;
 
     let localStream = null;
 
-    let callerCandidateIds = new Set();
+    let currentCallId = null;
+
+    let currentCallData = null;
+
+    let callerCandidates = new Set();
 
 
-    // ==================================
-    // WEBRTC
-    // ==================================
-
-    const configuration = {
-
+    const rtcConfig = {
       iceServers: [
-
         {
           urls: "stun:stun.l.google.com:19302"
         },
-
         {
           urls: "stun:stun1.l.google.com:19302"
         }
-
       ]
-
     };
 
 
-    // ==================================
-    // LOGIN ANONIM
-    // ==================================
+    // =========================
+    // LOGIN ANONYMOUS
+    // =========================
 
-    signInAnonymously(auth)
-      .catch((error) => {
+    async function startAuth() {
+
+      statusText.textContent =
+        "Menghubungkan ke server...";
+
+      try {
+
+        await signInAnonymously(auth);
+
+      } catch (error) {
 
         console.error(error);
 
         statusText.textContent =
-          "Gagal masuk Firebase";
-
-      });
-
-
-    onAuthStateChanged(auth, (user) => {
-
-      if (!user) return;
-
-      currentUser = user;
-
-      statusText.textContent =
-        "Menunggu panggilan...";
-
-      mulaiMencariPanggilan();
-
-    });
+          "Gagal terhubung Firebase: " +
+          error.message;
+      }
+    }
 
 
-    // ==================================
-    // MENCARI PANGGILAN
-    // ==================================
+    // =========================
+    // MENUNGGU PANGGILAN
+    // =========================
 
-    function mulaiMencariPanggilan() {
+    function listenForCalls() {
 
-      const callsRef =
-        collection(db, "calls");
+      const callsRef = collection(db, "calls");
 
-      const q = query(callsRef);
+      const q = query(
+        callsRef,
+        where("status", "==", "menunggu")
+      );
 
 
       onSnapshot(q, (snapshot) => {
 
-        let panggilanTerbaru = null;
+        if (snapshot.empty) {
 
-        let waktuTerbaru = 0;
+          statusText.textContent =
+            "Menunggu panggilan...";
+
+          controls.style.display = "none";
+
+          return;
+        }
 
 
-        snapshot.forEach((item) => {
+        let newestCall = null;
 
-          const data = item.data();
+        let newestTime = 0;
+
+
+        snapshot.forEach((callDoc) => {
+
+          const data = callDoc.data();
+
+          const time =
+            data.createdAtMs || 0;
 
 
           if (
-            data.status === "menunggu" &&
             data.offer &&
-            data.offer.type &&
-            data.offer.sdp
+            time >= newestTime
           ) {
 
-            const waktu =
-              data.createdAtMs || 0;
+            newestTime = time;
 
-
-            if (waktu > waktuTerbaru) {
-
-              waktuTerbaru = waktu;
-
-              panggilanTerbaru = {
-
-                id: item.id,
-
-                data: data
-
-              };
-
-            }
-
-          }
-
-        });
-
-
-        if (panggilanTerbaru) {
-
-          currentCallId =
-            panggilanTerbaru.id;
-
-          currentCallData =
-            panggilanTerbaru.data;
-
-
-          statusText.textContent =
-            "📞 ADA PANGGILAN MASUK";
-
-        }
-
-      });
-
-    }
-
-
-    // ==================================
-    // TERIMA
-    // ==================================
-
-    acceptButton.addEventListener(
-      "click",
-      async () => {
-
-        if (
-          !currentCallId ||
-          !currentCallData
-        ) {
-
-          statusText.textContent =
-            "Tidak ada panggilan.";
-
-          return;
-
-        }
-
-
-        try {
-
-          acceptButton.disabled = true;
-
-          rejectButton.disabled = true;
-
-
-          statusText.textContent =
-            "Menyalakan kamera...";
-
-
-          // ==================================
-          // KAMERA + MICROPHONE
-          // ==================================
-
-          localStream =
-            await navigator.mediaDevices.getUserMedia({
-
-              video: true,
-
-              audio: true
-
-            });
-
-
-          localVideo.srcObject =
-            localStream;
-
-
-          // ==================================
-          // PEER CONNECTION
-          // ==================================
-
-          peerConnection =
-            new RTCPeerConnection(
-              configuration
-            );
-
-
-          // Tambahkan kamera dan microphone
-
-          localStream
-            .getTracks()
-            .forEach((track) => {
-
-              peerConnection.addTrack(
-                track,
-                localStream
-              );
-
-            });
-
-
-          // ==================================
-          // VIDEO PEMANGGIL
-          // ==================================
-
-          peerConnection.ontrack =
-            (event) => {
-
-              console.log(
-                "Video pemanggil diterima"
-              );
-
-
-              if (
-                event.streams &&
-                event.streams[0]
-              ) {
-
-                remoteVideo.srcObject =
-                  event.streams[0];
-
-                statusText.textContent =
-                  "TERHUBUNG";
-
-              }
-
-            };
-
-
-          // ==================================
-          // TERIMA ICE CANDIDATE
-          // ==================================
-
-          peerConnection.onicecandidate =
-            async (event) => {
-
-              if (!event.candidate)
-                return;
-
-
-              try {
-
-                await updateDoc(
-
-                  doc(
-                    db,
-                    "calls",
-                    currentCallId
-                  ),
-
-                  {
-
-                    receiverCandidates:
-                      arrayUnion(
-                        event.candidate.toJSON()
-                      )
-
-                  }
-
-                );
-
-              } catch (error) {
-
-                console.error(
-                  "Gagal menyimpan candidate:",
-                  error
-                );
-
-              }
-
-            };
-
-
-          // ==================================
-          // OFFER PEMANGGIL
-          // ==================================
-
-          const offer =
-            new RTCSessionDescription(
-              currentCallData.offer
-            );
-
-
-          await peerConnection
-            .setRemoteDescription(
-              offer
-            );
-
-
-          // ==================================
-          // BUAT ANSWER
-          // ==================================
-
-          const answer =
-            await peerConnection
-              .createAnswer();
-
-
-          await peerConnection
-            .setLocalDescription(
-              answer
-            );
-
-
-          // ==================================
-          // SIMPAN ANSWER
-          // ==================================
-
-          await updateDoc(
-
-            doc(
-              db,
-              "calls",
-              currentCallId
-            ),
-
-            {
-
-              answer: {
-
-                type: answer.type,
-
-                sdp: answer.sdp
-
-              },
-
-              status: "terhubung"
-
-            }
-
-          );
-
-
-          statusText.textContent =
-            "Menghubungkan...";
-
-
-          // ==================================
-          // PANTAU CALL
-          // ==================================
-
-          onSnapshot(
-
-            doc(
-              db,
-              "calls",
-              currentCallId
-            ),
-
-            async (snapshot) => {
-
-              const data =
-                snapshot.data();
-
-              if (!data) return;
-
-
-              // ==============================
-              // CALLER CANDIDATES
-              // ==============================
-
-              if (
-                data.callerCandidates
-              ) {
-
-                for (
-                  const candidateData
-                  of data.callerCandidates
-                ) {
-
-                  const candidateKey =
-                    JSON.stringify(
-                      candidateData
-                    );
-
-
-                  if (
-                    callerCandidateIds.has(
-                      candidateKey
-                    )
-                  ) {
-
-                    continue;
-
-                  }
-
-
-                  callerCandidateIds.add(
-                    candidateKey
-                  );
-
-
-                  try {
-
-                    await peerConnection
-                      .addIceCandidate(
-
-                        new RTCIceCandidate(
-                          candidateData
-                        )
-
-                      );
-
-                  } catch (error) {
-
-                    console.log(
-                      "ICE belum siap:",
-                      error
-                    );
-
-                  }
-
-                }
-
-              }
-
-            }
-
-          );
-
-
-        } catch (error) {
-
-          console.error(error);
-
-
-          acceptButton.disabled =
-            false;
-
-          rejectButton.disabled =
-            false;
-
-
-          statusText.textContent =
-            "Gagal: " +
-            error.message;
-
-        }
-
-      }
-    );
-
-
-    // ==================================
-    // TOLAK
-    // ==================================
-
-    rejectButton.addEventListener(
-      "click",
-      async () => {
-
-        if (!currentCallId) {
-
-          statusText.textContent =
-            "Tidak ada panggilan.";
-
-          return;
-
-        }
-
-
-        try {
-
-          await updateDoc(
-
-            doc(
-              db,
-              "calls",
-              currentCallId
-            ),
-
-            {
-
-              status: "ditolak"
-
-            }
-
-          );
-
-
-          statusText.textContent =
-            "Panggilan ditolak.";
-
-
-          currentCallId = null;
-
-          currentCallData = null;
-
-
-        } catch (error) {
-
-          console.error(error);
-
-        }
-
-      }
-    );
-
-  </script>
-
-</body>
-  </html>
+            newestCall = {
